@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     # App meta
     APP_NAME: str = "AI Novel Platform"
     DEBUG: bool = True
+    
+    # Security
+    SECRET_KEY: str = "your-secret-key-change-in-production-please-make-it-secure-and-random"
 
     model_config = SettingsConfigDict(
         env_file=(

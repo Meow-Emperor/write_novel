@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from .api import ai, chapters, characters, novels, plots, worlds
+from .api import admin, ai, chapters, characters, novels, plots, worlds
 from .core.config import settings
 from .core.database import Base, engine
 from .core.logger import logger
@@ -48,6 +48,7 @@ app.include_router(worlds.router)
 app.include_router(plots.router)
 app.include_router(chapters.router)
 app.include_router(ai.router)
+app.include_router(admin.router)
 
 
 @app.get("/")

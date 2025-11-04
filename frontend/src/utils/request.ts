@@ -13,6 +13,10 @@ const request = axios.create({
 // Request interceptor
 request.interceptors.request.use(
   (config) => {
+    const adminToken = localStorage.getItem('admin_token')
+    if (adminToken && config.url?.includes('/admin')) {
+      config.headers.Authorization = `Bearer ${adminToken}`
+    }
     return config
   },
   (error) => {
