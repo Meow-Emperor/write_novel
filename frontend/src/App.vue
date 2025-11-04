@@ -1,0 +1,14 @@
+<template>
+  <router-view />
+</template>
+
+<script setup lang="ts">
+</script>
+
+<style>
+body {
+  margin: 0;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  background-color: #f5f6fa;
+}
+</style>
