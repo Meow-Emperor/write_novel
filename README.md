@@ -1,6 +1,61 @@
-# AI Novel Platform
+# ✨ AI 小说创作平台
 
-AI驱动的智能小说创作平台，支持世界观设定、角色管理、情节架构和AI辅助写作。
+AI驱动的智能小说创作平台，提供完整的创作工具链，包括小说管理、世界观设定、角色管理、情节架构和AI辅助写作。
+
+![Status](https://img.shields.io/badge/status-ready-brightgreen)
+![Version](https://img.shields.io/badge/version-1.1.0-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+## 🎯 特色功能
+
+- 📚 **小说管理** - 创建、编辑、管理你的小说作品
+- 🎨 **美观UI** - 现代化的渐变设计和流畅动画
+- 📱 **响应式** - 完美支持桌面和移动设备
+- 🤖 **AI集成** - 支持 OpenAI、Anthropic 等多个AI提供商
+- 🚀 **高性能** - 优化的数据库和缓存策略
+- 🔒 **安全** - 完善的数据验证和错误处理
+
+## 🚀 快速开始
+
+### 📋 环境要求
+
+- Python 3.9+
+- Node.js 18+
+- Git
+
+### 🔧 安装步骤
+
+**克隆仓库**
+```bash
+git clone <repository-url>
+cd write_novel
+```
+
+**启动后端**
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+alembic upgrade head
+uvicorn app.main:app --reload
+```
+
+**启动前端**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+**访问应用**
+- 前端: http://localhost:5173
+- 后端API: http://localhost:8000
+- API文档: http://localhost:8000/docs
+
+## 📖 使用指南
+
+详细的使用说明请参阅 [SETUP_GUIDE.md](SETUP_GUIDE.md)
 
 ## 技术栈
 
