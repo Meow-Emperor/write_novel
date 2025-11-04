@@ -88,6 +88,10 @@
   </div>
 </template>
 
+<!--
+  小说列表页面
+  功能：展示所有小说、创建新小说、编辑和删除小说
+-->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
@@ -96,10 +100,15 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import type { Novel, NovelCreate } from '@/types/novel'
 
+// 路由实例
 const router = useRouter()
+// 小说Store实例
 const novelStore = useNovelStore()
+// 对话框显示状态
 const showDialog = ref(false)
+// 当前正在编辑的小说（null表示创建新小说）
 const editingNovel = ref<Novel | null>(null)
+// 小说表单数据
 const novelForm = ref<NovelCreate>({
   title: '',
   author: '',
@@ -108,6 +117,7 @@ const novelForm = ref<NovelCreate>({
   description: ''
 })
 
+// 组件挂载时加载小说列表
 onMounted(async () => {
   try {
     await novelStore.fetchNovels()
@@ -116,10 +126,16 @@ onMounted(async () => {
   }
 })
 
+/**
+ * 处理表格行点击事件 - 跳转到小说详情页
+ */
 function handleRowClick(row: Novel) {
   router.push(`/novels/${row.id}`)
 }
 
+/**
+ * 打开创建小说对话框
+ */
 function openCreateDialog() {
   editingNovel.value = null
   showDialog.value = true
@@ -132,6 +148,9 @@ function openCreateDialog() {
   }
 }
 
+/**
+ * 编辑小说 - 打开编辑对话框并填充数据
+ */
 function editNovel(novel: Novel) {
   editingNovel.value = novel
   novelForm.value = {
@@ -144,10 +163,16 @@ function editNovel(novel: Novel) {
   showDialog.value = true
 }
 
+/**
+ * 关闭对话框
+ */
 function closeDialog() {
   showDialog.value = false
 }
 
+/**
+ * 保存小说（创建或更新）
+ */
 async function saveNovel() {
   if (!novelForm.value.title.trim()) {
     ElMessage.warning('请输入小说标题')
@@ -155,9 +180,11 @@ async function saveNovel() {
   }
   try {
     if (editingNovel.value) {
+      // 更新现有小说
       await novelStore.updateNovel(editingNovel.value.id, novelForm.value)
       ElMessage.success('更新成功')
     } else {
+      // 创建新小说
       await novelStore.createNovel(novelForm.value)
       ElMessage.success('创建成功')
     }
@@ -167,6 +194,9 @@ async function saveNovel() {
   }
 }
 
+/**
+ * 确认删除小说
+ */
 async function confirmDelete(id: string) {
   try {
     await ElMessageBox.confirm('确定要删除这部小说吗？', '警告', {
@@ -181,6 +211,9 @@ async function confirmDelete(id: string) {
   }
 }
 
+/**
+ * 获取状态对应的标签类型
+ */
 function getStatusType(status: string) {
   const typeMap: Record<string, string> = {
     DRAFT: 'info',
@@ -191,6 +224,9 @@ function getStatusType(status: string) {
   return typeMap[status] ?? 'info'
 }
 
+/**
+ * 获取状态的中文标签
+ */
 function getStatusLabel(status: string) {
   const labelMap: Record<string, string> = {
     DRAFT: '草稿',
@@ -201,6 +237,9 @@ function getStatusLabel(status: string) {
   return labelMap[status] ?? status
 }
 
+/**
+ * 格式化日期为本地时间字符串
+ */
 function formatDate(value: string) {
   return new Date(value).toLocaleString('zh-CN')
 }
