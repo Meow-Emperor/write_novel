@@ -30,7 +30,14 @@ def upgrade() -> None:
     bind = op.get_bind()
     inspector = inspect(bind)
 
-    status_enum = _create_enum_if_needed(bind)
+    # For SQLite, we use String instead of Enum to avoid compatibility issues
+    is_sqlite = bind.dialect.name == "sqlite"
+    
+    if is_sqlite:
+        status_type = sa.String(length=20)
+    else:
+        status_enum = _create_enum_if_needed(bind)
+        status_type = status_enum
 
     if "novels" not in inspector.get_table_names():
         op.create_table(
@@ -40,20 +47,26 @@ def upgrade() -> None:
             sa.Column("author", sa.String(length=100), nullable=True),
             sa.Column("genre", sa.String(length=50), nullable=True),
             sa.Column("synopsis", sa.Text(), nullable=True),
-            sa.Column("status", status_enum, nullable=False, server_default="DRAFT"),
+            sa.Column("description", sa.Text(), nullable=True),
+            sa.Column("status", status_type, nullable=False, server_default="DRAFT"),
             sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
             sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
         )
-        op.alter_column("novels", "status", server_default=None)
+        # Create indexes for better performance
+        op.create_index("ix_novels_title", "novels", ["title"])
+        op.create_index("ix_novels_author", "novels", ["author"])
+        op.create_index("ix_novels_genre", "novels", ["genre"])
+        op.create_index("ix_novels_status", "novels", ["status"])
+        op.create_index("ix_novels_created_at", "novels", ["created_at"])
     else:
         columns = {column["name"] for column in inspector.get_columns("novels")}
         if "status" not in columns:
             op.add_column(
                 "novels",
-                sa.Column("status", status_enum, nullable=False, server_default="DRAFT"),
+                sa.Column("status", status_type, nullable=False, server_default="DRAFT"),
             )
-            op.execute("UPDATE novels SET status = 'DRAFT' WHERE status IS NULL")
-            op.alter_column("novels", "status", server_default=None)
+        if "description" not in columns:
+            op.add_column("novels", sa.Column("description", sa.Text(), nullable=True))
         if "synopsis" not in columns:
             op.add_column("novels", sa.Column("synopsis", sa.Text(), nullable=True))
 
@@ -79,8 +92,10 @@ def downgrade() -> None:
     if "world_settings" in inspector.get_table_names():
         op.drop_table("world_settings")
 
-    columns = {column["name"] for column in inspector.get_columns("novels")} if "novels" in inspector.get_table_names() else set()
-    if "status" in columns:
-        op.drop_column("novels", "status")
-    status_enum = sa.Enum(*STATUS_VALUES, name=NOVEL_STATUS_ENUM_NAME)
-    status_enum.drop(bind, checkfirst=True)
+    if "novels" in inspector.get_table_names():
+        op.drop_table("novels")
+    
+    # Clean up enum if using PostgreSQL
+    if bind.dialect.name != "sqlite":
+        status_enum = sa.Enum(*STATUS_VALUES, name=NOVEL_STATUS_ENUM_NAME)
+        status_enum.drop(bind, checkfirst=True)
