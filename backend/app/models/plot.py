@@ -16,10 +16,11 @@ class Plot(Base):
     novel_id = Column(String(36), ForeignKey("novels.id", ondelete="CASCADE"), nullable=False)
     title = Column(String(200), nullable=False)
     description = Column(Text)
-    plot_type = Column(String(50))  # main, subplot, arc, etc.
+    act = Column(String(50))
+    key_events = Column(Text)
+    characters = Column(Text)
+    conflicts = Column(Text)
     order = Column(Integer, default=0)
-    status = Column(String(50))  # planned, in_progress, completed
-    notes = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
