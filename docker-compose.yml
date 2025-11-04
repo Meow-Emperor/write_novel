@@ -8,10 +8,11 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=sqlite:///./ai_novel.db
+      - DATABASE_URL=sqlite:////app/data/ai_novel.db
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production-please-make-it-secure-and-random}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+      - ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
     volumes:
       - ./backend:/app
       - backend-data:/app/data

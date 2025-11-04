@@ -106,11 +106,27 @@ const novel = computed(() => novelStore.currentNovel)
 
 const tools = computed(() => [
   {
-    name: '内容编辑',
-    description: '开始创作你的小说内容',
-    icon: EditPen,
-    color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    route: `/novels/${novelId.value}/editor`,
+    name: '章节蓝图',
+    description: '详细规划章节内容',
+    icon: List,
+    color: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+    route: `/novels/${novelId.value}/chapters`,
+    available: true
+  },
+  {
+    name: '角色管理',
+    description: '塑造丰富立体的人物',
+    icon: User,
+    color: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+    route: `/novels/${novelId.value}/characters`,
+    available: true
+  },
+  {
+    name: '情节架构',
+    description: '设计引人入胜的故事',
+    icon: TrendCharts,
+    color: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+    route: `/novels/${novelId.value}/plot`,
     available: true
   },
   {
@@ -119,31 +135,15 @@ const tools = computed(() => [
     icon: Location,
     color: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
     route: `/novels/${novelId.value}/world`,
-    available: false
+    available: true
   },
   {
-    name: '角色管理',
-    description: '塑造丰富立体的人物',
-    icon: User,
-    color: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-    route: `/novels/${novelId.value}/characters`,
-    available: false
-  },
-  {
-    name: '情节架构',
-    description: '设计引人入胜的故事',
-    icon: TrendCharts,
-    color: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-    route: `/novels/${novelId.value}/plot`,
-    available: false
-  },
-  {
-    name: '章节蓝图',
-    description: '详细规划章节内容',
-    icon: List,
-    color: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-    route: `/novels/${novelId.value}/chapters`,
-    available: false
+    name: '内容编辑',
+    description: '开始创作你的小说内容',
+    icon: EditPen,
+    color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    route: `/novels/${novelId.value}/editor`,
+    available: true
   }
 ])
 
