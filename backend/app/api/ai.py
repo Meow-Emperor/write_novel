@@ -8,6 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from ..core.database import get_db
+from ..core.logger import logger
 from ..models.novel import Novel
 from ..schemas.ai import AIGenerateRequest, AIGenerateResponse
 from ..services.ai_service import AIService
@@ -36,6 +37,7 @@ def _build_context(db: Session, novel_id: UUID) -> Dict[str, Any]:
 
 @router.post("/generate", response_model=AIGenerateResponse)
 async def generate_content(payload: AIGenerateRequest, db: Session = Depends(get_db)):
+    logger.info(f"AI generation request for novel {payload.novel_id} with provider {payload.provider}")
     try:
         context = _build_context(db, payload.novel_id)
         service = AIService(
@@ -45,8 +47,10 @@ async def generate_content(payload: AIGenerateRequest, db: Session = Depends(get
             model_name=payload.model_name or "gpt-4",
         )
         result = await service.generate(payload.prompt, context, max_tokens=payload.max_tokens or 2000)
+        logger.info(f"AI generation completed, tokens used: {result.get('tokens_used', 0)}")
         return AIGenerateResponse(**result)
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001
+        logger.error(f"AI generation error: {exc}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
