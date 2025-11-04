@@ -30,7 +30,10 @@ class Novel(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    world_setting = relationship("WorldSetting", back_populates="novel", uselist=False)
+    world_setting = relationship("WorldSetting", back_populates="novel", uselist=False, cascade="all, delete-orphan")
+    characters = relationship("Character", back_populates="novel", cascade="all, delete-orphan")
+    plots = relationship("Plot", back_populates="novel", cascade="all, delete-orphan")
+    chapters = relationship("Chapter", back_populates="novel", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Novel id={self.id} title={self.title!r}>"
@@ -42,4 +45,3 @@ class Novel(Base):
     @synopsis.setter
     def synopsis(self, value: str | None) -> None:
         self.description = value
-
