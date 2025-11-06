@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import List
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
@@ -16,7 +15,8 @@ router = APIRouter(prefix="/api/plots", tags=["plots"])
 
 
 @router.get("/", response_model=List[PlotResponse])
-async def list_plots(novel_id: UUID = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+@router.get("", response_model=List[PlotResponse])
+async def list_plots(novel_id: str | None = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Retrieve a paginated list of plots."""
     try:
         logger.info(f"Fetching plots with novel_id={novel_id}, skip={skip}, limit={limit}")
@@ -32,11 +32,11 @@ async def list_plots(novel_id: UUID = None, skip: int = 0, limit: int = 100, db:
 
 
 @router.get("/{plot_id}", response_model=PlotResponse)
-async def get_plot(plot_id: UUID, db: Session = Depends(get_db)):
+async def get_plot(plot_id: int, db: Session = Depends(get_db)):
     """Retrieve a single plot by its identifier."""
     try:
         logger.info(f"Fetching plot with id={plot_id}")
-        plot = db.query(Plot).filter(Plot.id == str(plot_id)).first()
+        plot = db.query(Plot).filter(Plot.id == plot_id).first()
     except SQLAlchemyError as exc:
         logger.error(f"Database error in get_plot: {exc}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
@@ -50,11 +50,15 @@ async def get_plot(plot_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=PlotResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=PlotResponse, status_code=status.HTTP_201_CREATED)
 async def create_plot(payload: PlotCreate, db: Session = Depends(get_db)):
     """Create a new plot entry."""
     try:
         logger.info(f"Creating plot: {payload.title}")
-        plot = Plot(**payload.model_dump())
+        # Convert UUID to string for SQLite compatibility
+        data = payload.model_dump()
+        data['novel_id'] = str(data['novel_id'])
+        plot = Plot(**data)
         db.add(plot)
         db.commit()
         db.refresh(plot)
@@ -67,11 +71,11 @@ async def create_plot(payload: PlotCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/{plot_id}", response_model=PlotResponse)
-async def update_plot(plot_id: UUID, payload: PlotUpdate, db: Session = Depends(get_db)):
+async def update_plot(plot_id: int, payload: PlotUpdate, db: Session = Depends(get_db)):
     """Update an existing plot."""
     try:
         logger.info(f"Updating plot: {plot_id}")
-        plot = db.query(Plot).filter(Plot.id == str(plot_id)).first()
+        plot = db.query(Plot).filter(Plot.id == plot_id).first()
         if not plot:
             logger.warning(f"Plot not found for update: {plot_id}")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plot not found")
@@ -94,11 +98,11 @@ async def update_plot(plot_id: UUID, payload: PlotUpdate, db: Session = Depends(
 
 
 @router.delete("/{plot_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_plot(plot_id: UUID, db: Session = Depends(get_db)):
+async def delete_plot(plot_id: int, db: Session = Depends(get_db)):
     """Delete a plot by identifier."""
     try:
         logger.info(f"Deleting plot: {plot_id}")
-        plot = db.query(Plot).filter(Plot.id == str(plot_id)).first()
+        plot = db.query(Plot).filter(Plot.id == plot_id).first()
         if not plot:
             logger.warning(f"Plot not found for deletion: {plot_id}")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plot not found")

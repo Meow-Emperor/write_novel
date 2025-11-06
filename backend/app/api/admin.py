@@ -11,9 +11,10 @@ from sqlalchemy.orm import Session
 
 from ..core.database import get_db
 from ..core.logger import logger
-from ..core.security import create_access_token, get_password_hash, verify_password, verify_token
+from ..core.security import create_access_token, hash_password, verify_password
 from ..models.admin import Admin
 from ..models.novel import Novel
+from ..schemas.novel import NovelResponse
 from ..schemas.admin import AdminCreate, AdminLogin, AdminResponse, AdminUpdate, Token
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -25,8 +26,9 @@ async def get_current_admin(
     db: Session = Depends(get_db)
 ) -> Admin:
     """Get the current authenticated admin."""
+    from ..core.security import decode_access_token
     token = credentials.credentials
-    payload = verify_token(token)
+    payload = decode_access_token(token)
     
     if not payload:
         raise HTTPException(
@@ -92,7 +94,7 @@ async def login(payload: AdminLogin, db: Session = Depends(get_db)):
         db.commit()
         
         access_token = create_access_token(
-            data={"sub": admin.id, "username": admin.username},
+            subject=admin.id,
             expires_delta=timedelta(hours=24)
         )
         
@@ -112,17 +114,18 @@ async def login(payload: AdminLogin, db: Session = Depends(get_db)):
 @router.post("/register", response_model=AdminResponse, status_code=status.HTTP_201_CREATED)
 async def register_admin(
     payload: AdminCreate,
-    db: Session = Depends(get_db),
-    current_admin: Optional[Admin] = None
+    db: Session = Depends(get_db)
 ):
     """Register a new admin (first admin can self-register, others need superuser)."""
     try:
         admin_count = db.query(Admin).count()
-        
-        if admin_count > 0 and (not current_admin or not current_admin.is_superuser):
+
+        # First admin can self-register, others would need authentication
+        # For simplicity, we allow registration if no admins exist
+        if admin_count > 0:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only superusers can create new admin accounts",
+                detail="Admin registration is closed. Contact existing superuser.",
             )
         
         existing_admin = db.query(Admin).filter(
@@ -136,10 +139,10 @@ async def register_admin(
                 detail="Username or email already registered",
             )
         
-        admin_data = payload.model_dump(exclude={"password"})
+        admin_data = payload.model_dump(exclude={"password", "is_superuser"})
         admin = Admin(
             **admin_data,
-            hashed_password=get_password_hash(payload.password),
+            hashed_password=hash_password(payload.password),
             is_superuser=True if admin_count == 0 else payload.is_superuser
         )
         
@@ -158,6 +161,20 @@ async def register_admin(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(exc),
+        ) from exc
+
+
+@router.get("/can-register")
+async def can_register(db: Session = Depends(get_db)):
+    """Public endpoint: whether registration is allowed (no admins yet)."""
+    try:
+        admin_count = db.query(Admin).count()
+        return {"can_register": admin_count == 0}
+    except SQLAlchemyError as exc:
+        logger.error(f"Database error in can_register: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error",
         ) from exc
 
 
@@ -218,7 +235,7 @@ async def update_admin(
             setattr(admin, field, value)
         
         if payload.password:
-            admin.hashed_password = get_password_hash(payload.password)
+            admin.hashed_password = hash_password(payload.password)
         
         db.commit()
         db.refresh(admin)
@@ -282,10 +299,11 @@ async def get_stats(
     """Get platform statistics."""
     try:
         novel_count = db.query(Novel).count()
-        draft_count = db.query(Novel).filter(Novel.status == "DRAFT").count()
-        in_progress_count = db.query(Novel).filter(Novel.status == "IN_PROGRESS").count()
-        completed_count = db.query(Novel).filter(Novel.status == "COMPLETED").count()
-        published_count = db.query(Novel).filter(Novel.status == "PUBLISHED").count()
+        # Normalize to lowercase statuses used by the model (default 'draft')
+        draft_count = db.query(Novel).filter(Novel.status.in_(["draft", "DRAFT"])) .count()
+        in_progress_count = db.query(Novel).filter(Novel.status.in_(["in_progress", "IN_PROGRESS"])) .count()
+        completed_count = db.query(Novel).filter(Novel.status.in_(["completed", "COMPLETED"])) .count()
+        published_count = db.query(Novel).filter(Novel.status.in_(["published", "PUBLISHED"])) .count()
         admin_count = db.query(Admin).count()
         
         return {
@@ -306,7 +324,7 @@ async def get_stats(
         ) from exc
 
 
-@router.get("/novels", response_model=List)
+@router.get("/novels", response_model=List[NovelResponse])
 async def admin_list_novels(
     skip: int = 0,
     limit: int = 100,
@@ -316,10 +334,10 @@ async def admin_list_novels(
     """List all novels (admin view with more details)."""
     try:
         logger.info(f"Admin fetching novels with skip={skip}, limit={limit}")
-        from ..schemas.novel import NovelResponse
+        from .novels import _build_response
         novels = db.query(Novel).order_by(Novel.created_at.desc()).offset(skip).limit(limit).all()
         logger.info(f"Retrieved {len(novels)} novels for admin")
-        return novels
+        return [_build_response(n) for n in novels]
     except SQLAlchemyError as exc:
         logger.error(f"Database error in admin_list_novels: {exc}")
         raise HTTPException(

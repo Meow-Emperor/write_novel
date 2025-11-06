@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import List
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
@@ -16,7 +15,8 @@ router = APIRouter(prefix="/api/worlds", tags=["worlds"])
 
 
 @router.get("/", response_model=List[WorldSettingResponse])
-async def list_world_settings(novel_id: UUID = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+@router.get("", response_model=List[WorldSettingResponse])
+async def list_world_settings(novel_id: str | None = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Retrieve a paginated list of world settings."""
     try:
         logger.info(f"Fetching world settings with novel_id={novel_id}, skip={skip}, limit={limit}")
@@ -32,11 +32,11 @@ async def list_world_settings(novel_id: UUID = None, skip: int = 0, limit: int =
 
 
 @router.get("/{world_id}", response_model=WorldSettingResponse)
-async def get_world_setting(world_id: UUID, db: Session = Depends(get_db)):
+async def get_world_setting(world_id: int, db: Session = Depends(get_db)):
     """Retrieve a single world setting by its identifier."""
     try:
         logger.info(f"Fetching world setting with id={world_id}")
-        world_setting = db.query(WorldSetting).filter(WorldSetting.id == str(world_id)).first()
+        world_setting = db.query(WorldSetting).filter(WorldSetting.id == world_id).first()
     except SQLAlchemyError as exc:
         logger.error(f"Database error in get_world_setting: {exc}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
@@ -50,7 +50,7 @@ async def get_world_setting(world_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/novel/{novel_id}", response_model=WorldSettingResponse)
-async def get_world_by_novel(novel_id: UUID, db: Session = Depends(get_db)):
+async def get_world_by_novel(novel_id: str, db: Session = Depends(get_db)):
     """Retrieve world setting by novel ID."""
     try:
         logger.info(f"Fetching world setting for novel: {novel_id}")
@@ -70,11 +70,12 @@ async def get_world_by_novel(novel_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=WorldSettingResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=WorldSettingResponse, status_code=status.HTTP_201_CREATED)
 async def create_world_setting(payload: WorldSettingCreate, db: Session = Depends(get_db)):
     """Create a new world setting entry."""
     try:
         logger.info(f"Creating world setting for novel: {payload.novel_id}")
-        
+
         # Check if world setting already exists for this novel
         existing = db.query(WorldSetting).filter(WorldSetting.novel_id == str(payload.novel_id)).first()
         if existing:
@@ -83,8 +84,11 @@ async def create_world_setting(payload: WorldSettingCreate, db: Session = Depend
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="World setting already exists for this novel"
             )
-        
-        world_setting = WorldSetting(**payload.model_dump())
+
+        # Convert UUID to string for SQLite compatibility
+        data = payload.model_dump()
+        data['novel_id'] = str(data['novel_id'])
+        world_setting = WorldSetting(**data)
         db.add(world_setting)
         db.commit()
         db.refresh(world_setting)
@@ -99,11 +103,11 @@ async def create_world_setting(payload: WorldSettingCreate, db: Session = Depend
 
 
 @router.put("/{world_id}", response_model=WorldSettingResponse)
-async def update_world_setting(world_id: UUID, payload: WorldSettingUpdate, db: Session = Depends(get_db)):
+async def update_world_setting(world_id: int, payload: WorldSettingUpdate, db: Session = Depends(get_db)):
     """Update an existing world setting."""
     try:
         logger.info(f"Updating world setting: {world_id}")
-        world_setting = db.query(WorldSetting).filter(WorldSetting.id == str(world_id)).first()
+        world_setting = db.query(WorldSetting).filter(WorldSetting.id == world_id).first()
         if not world_setting:
             logger.warning(f"World setting not found for update: {world_id}")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="World setting not found")
@@ -126,11 +130,11 @@ async def update_world_setting(world_id: UUID, payload: WorldSettingUpdate, db: 
 
 
 @router.delete("/{world_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_world_setting(world_id: UUID, db: Session = Depends(get_db)):
+async def delete_world_setting(world_id: int, db: Session = Depends(get_db)):
     """Delete a world setting by identifier."""
     try:
         logger.info(f"Deleting world setting: {world_id}")
-        world_setting = db.query(WorldSetting).filter(WorldSetting.id == str(world_id)).first()
+        world_setting = db.query(WorldSetting).filter(WorldSetting.id == world_id).first()
         if not world_setting:
             logger.warning(f"World setting not found for deletion: {world_id}")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="World setting not found")
