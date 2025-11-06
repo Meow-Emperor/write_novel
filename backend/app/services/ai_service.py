@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import hashlib
 import json
 
@@ -6,10 +6,21 @@ import httpx
 
 from ..core.config import settings
 
+# Import optional dependencies
 try:
     import redis  # type: ignore
 except ImportError:
     redis = None
+
+try:
+    import ollama  # type: ignore
+except ImportError:
+    ollama = None
+
+try:
+    from langchain_text_splitters import RecursiveCharacterTextSplitter  # type: ignore
+except ImportError:
+    RecursiveCharacterTextSplitter = None
 
 if redis is not None and settings.AI_CACHE_ENABLED:
     try:
@@ -99,6 +110,8 @@ class AIService:
             result = await self._generate_openai(full_prompt, max_tokens, temperature)
         elif self.provider == "anthropic":
             result = await self._generate_anthropic(full_prompt, max_tokens, temperature)
+        elif self.provider == "ollama":
+            result = await self._generate_ollama(full_prompt, max_tokens, temperature)
         else:
             result = await self._generate_custom(full_prompt, max_tokens, temperature)
 
