@@ -1,11 +1,14 @@
 <template>
   <Layout>
-    <router-view />
+    <ErrorBoundary>
+      <router-view />
+    </ErrorBoundary>
   </Layout>
 </template>
 
 <script setup lang="ts">
 import Layout from './components/Layout.vue'
+import ErrorBoundary from './components/ErrorBoundary.vue'
 </script>
 
 <style>

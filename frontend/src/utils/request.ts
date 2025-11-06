@@ -1,9 +1,10 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import { config } from '@/config'
 
+// In development, use empty baseURL to rely on Vite proxy
+// The proxy will forward /api/* to backend:8000
 const request = axios.create({
-  baseURL: config.apiBaseUrl,
+  baseURL: '',  // Always use empty string to rely on Vite dev proxy
   timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
@@ -14,7 +15,10 @@ const request = axios.create({
 request.interceptors.request.use(
   (config) => {
     const adminToken = localStorage.getItem('admin_token')
-    if (adminToken && config.url?.includes('/admin')) {
+    const url = config.url || ''
+    const isAdminAPI = url.includes('/admin')
+    const isAuthEndpoint = url.endsWith('/admin/login') || url.endsWith('/admin/register')
+    if (adminToken && isAdminAPI && !isAuthEndpoint) {
       config.headers.Authorization = `Bearer ${adminToken}`
     }
     return config
@@ -32,14 +36,12 @@ request.interceptors.response.use(
   },
   (error) => {
     const message = error.response?.data?.detail || error.message || 'Unknown error'
-    
-    if (config.isDevelopment) {
-      console.error('Response error:', error)
-    }
-    
+
+    console.error('Response error:', error)
+
     // Show error message
     ElMessage.error(message)
-    
+
     return Promise.reject(error)
   }
 )

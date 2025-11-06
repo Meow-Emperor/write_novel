@@ -8,6 +8,26 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/Home.vue')
   },
   {
+    path: '/inspiration',
+    name: 'InspirationMode',
+    component: () => import('@/views/InspirationMode.vue')
+  },
+  {
+    path: '/admin/login',
+    name: 'AdminLogin',
+    component: () => import('@/views/AdminLogin.vue')
+  },
+  {
+    path: '/admin',
+    name: 'Admin',
+    component: () => import('@/views/Admin.vue')
+  },
+  {
+    path: '/admin/register',
+    name: 'AdminRegister',
+    component: () => import('@/views/AdminRegister.vue')
+  },
+  {
     path: '/novels',
     name: 'NovelList',
     component: () => import('@/views/NovelList.vue')

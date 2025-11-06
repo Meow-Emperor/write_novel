@@ -33,7 +33,7 @@
             <h3 class="feature-title">{{ module.name }}</h3>
             <p class="feature-description">{{ module.description }}</p>
             <el-tag :type="module.status === 'active' ? 'success' : 'info'" size="small">
-              {{ module.status === 'active' ? '可用' : '即将推出' }}
+              {{ module.status === 'active' ? '可用' : '需先选择小说' }}
             </el-tag>
           </el-card>
         </el-col>
@@ -89,6 +89,7 @@
       </el-form>
       <template #footer>
         <el-button @click="showAIConfig = false">取消</el-button>
+        <el-button @click="handleTestConfig" :loading="testing">测试连接</el-button>
         <el-button type="primary" @click="handleSaveConfig">保存配置</el-button>
       </template>
     </el-dialog>
@@ -102,13 +103,14 @@ import { useRouter } from 'vue-router'
 import { useAIStore } from '@/stores/ai'
 import { useNovelStore } from '@/stores/novel'
 import { ElMessage } from 'element-plus'
-import { 
-  Document, 
-  User, 
-  Location, 
-  TrendCharts, 
-  List, 
-  Edit, 
+import request from '@/utils/request'
+import {
+  Document,
+  User,
+  Location,
+  TrendCharts,
+  List,
+  Edit,
   EditPen,
   Setting,
   DataLine,
@@ -128,6 +130,7 @@ const aiConfig = ref({
   api_key: '',
   model_name: ''
 })
+const testing = ref(false)
 
 const stats = ref([
   { label: '我的小说', value: '0', icon: Notebook, color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
@@ -143,7 +146,7 @@ onMounted(async () => {
     const published = novelStore.novels.filter(n => n.status === 'PUBLISHED').length
     stats.value[2].value = published.toString()
   } catch (error) {
-    console.error('Failed to load stats:', error)
+    ElMessage.error('加载统计信息失败')
   }
 })
 
@@ -153,11 +156,28 @@ const handleSaveConfig = () => {
   showAIConfig.value = false
 }
 
+const handleTestConfig = async () => {
+  testing.value = true
+  try {
+    const resp = await request.post('/api/ai/test-config', {
+      provider: aiConfig.value.provider,
+      base_url: aiConfig.value.base_url || undefined,
+      api_key: aiConfig.value.api_key || undefined,
+      model_name: aiConfig.value.model_name || undefined
+    })
+    ElMessage.success(resp.data?.message || '连接成功')
+  } catch (err: any) {
+    ElMessage.error(err.response?.data?.detail || err.message || '连接失败')
+  } finally {
+    testing.value = false
+  }
+}
+
 const handleModuleClick = (module: any) => {
   if (module.route) {
     router.push(module.route)
   } else {
-    ElMessage.info('该功能即将推出')
+    ElMessage.info('请先创建或选择一个小说，然后在小说详情页访问此功能')
   }
 }
 
@@ -172,46 +192,62 @@ const modules = [
   },
   {
     name: '角色管理',
-    description: '塑造丰富立体的人物形象',
+    description: '塑造丰富立体的人物形象（需先选择小说）',
     icon: User,
     color: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-    status: 'coming'
+    status: 'coming',
+    hint: '请先进入具体小说',
+    route: '/novels'
   },
   {
     name: '情节架构',
-    description: '设计引人入胜的故事脉络',
+    description: '设计引人入胜的故事脉络（需先选择小说）',
     icon: TrendCharts,
     color: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-    status: 'coming'
+    status: 'coming',
+    hint: '请先进入具体小说',
+    route: '/novels'
   },
   {
     name: '世界观设定',
-    description: '构建独特的小说世界',
+    description: '构建独特的小说世界（需先选择小说）',
     icon: Location,
     color: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-    status: 'coming'
+    status: 'coming',
+    hint: '请先进入具体小说',
+    route: '/novels'
   },
   {
     name: '章节蓝图',
-    description: '详细规划每个章节内容',
+    description: '详细规划每个章节内容（需先选择小说）',
     icon: List,
     color: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-    status: 'coming'
+    status: 'coming',
+    hint: '请先进入具体小说',
+    route: '/novels'
   },
   {
     name: 'AI 内容生成',
-    description: '智能辅助创作精彩内容',
+    description: '智能辅助创作精彩内容（需先选择小说）',
     icon: Edit,
     color: 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
-    status: 'coming'
+    status: 'coming',
+    hint: '请先进入具体小说',
+    route: '/novels'
+  },
+  {
+    name: '灵感模式',
+    description: '对话式引导，快速构建雏形',
+    icon: EditPen,
+    color: 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
+    status: 'active',
+    route: '/inspiration'
   }
 ]
 </script>
 
 <style scoped>
-.home {
-  padding: 0;
-}
+.home { padding: 0; }
 
 .hero-section {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -222,171 +258,24 @@ const modules = [
   margin-bottom: 60px;
 }
 
-.hero-content {
-  max-width: 800px;
-  margin: 0 auto;
-}
+.hero-content { max-width: 800px; margin: 0 auto; }
+.hero-title { font-size: 48px; font-weight: bold; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 12px; }
+.hero-subtitle { font-size: 16px; color: rgba(255,255,255,0.9); margin-bottom: 24px; }
+.hero-actions { display: flex; gap: 12px; justify-content: center; }
 
-.hero-title {
-  font-size: 48px;
-  font-weight: bold;
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-}
+.section-title { font-size: 24px; font-weight: 600; margin: 20px 0; }
+.features-grid { margin-top: 10px; }
+.feature-card { cursor: pointer; text-align: center; }
+.feature-icon { width: 72px; height: 72px; border-radius: 16px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; color: #fff; }
+.feature-title { margin: 0 0 8px; }
+.feature-description { color: #666; min-height: 40px; }
 
-.title-icon {
-  animation: float 3s ease-in-out infinite;
-}
+.stats-section { margin-top: 40px; }
+.stat-card { display: flex; align-items: center; gap: 12px; padding: 16px; background: #f5f7fa; border-radius: 8px; }
+.stat-icon { width: 56px; height: 56px; border-radius: 50%; color: #fff; display: inline-flex; align-items: center; justify-content: center; }
+.stat-content { text-align: left; }
+.stat-value { font-size: 24px; font-weight: bold; line-height: 1; }
+.stat-label { color: #666; }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-
-.hero-subtitle {
-  font-size: 20px;
-  margin-bottom: 40px;
-  opacity: 0.95;
-  line-height: 1.6;
-}
-
-.hero-actions {
-  display: flex;
-  gap: 16px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.features-section {
-  padding: 40px;
-}
-
-.section-title {
-  font-size: 32px;
-  text-align: center;
-  margin-bottom: 40px;
-  color: #333;
-  font-weight: bold;
-}
-
-.features-grid {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.feature-card {
-  text-align: center;
-  padding: 30px 20px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  height: 100%;
-  border-radius: 12px;
-  border: 2px solid transparent;
-}
-
-.feature-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 12px 24px rgba(102, 126, 234, 0.2);
-  border-color: #667eea;
-}
-
-.feature-icon {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 20px;
-  color: white;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.feature-title {
-  font-size: 20px;
-  margin-bottom: 12px;
-  color: #333;
-  font-weight: 600;
-}
-
-.feature-description {
-  color: #666;
-  font-size: 14px;
-  margin-bottom: 16px;
-  line-height: 1.6;
-}
-
-.stats-section {
-  padding: 40px;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
-  margin: 40px 0 0;
-}
-
-.stat-card {
-  background: white;
-  padding: 30px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s ease;
-}
-
-.stat-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
-}
-
-.stat-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  flex-shrink: 0;
-}
-
-.stat-content {
-  flex: 1;
-}
-
-.stat-value {
-  font-size: 32px;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 4px;
-}
-
-.stat-label {
-  font-size: 14px;
-  color: #666;
-}
-
-@media (max-width: 768px) {
-  .hero-title {
-    font-size: 32px;
-  }
-
-  .hero-subtitle {
-    font-size: 16px;
-  }
-
-  .section-title {
-    font-size: 24px;
-  }
-
-  .stats-section {
-    padding: 20px;
-  }
-
-  .stat-card {
-    margin-bottom: 16px;
-  }
-}
+.title-icon { vertical-align: middle; }
 </style>

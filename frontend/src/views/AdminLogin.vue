@@ -31,13 +31,16 @@
             登录
           </el-button>
         </el-form-item>
+        <div class="tips" v-if="canRegister">
+          首次使用？<el-link type="primary" @click="goRegister">注册管理员</el-link>
+        </div>
       </el-form>
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '../utils/request'
@@ -45,6 +48,7 @@ import request from '../utils/request'
 const router = useRouter()
 const formRef = ref()
 const loading = ref(false)
+const canRegister = ref(false)
 
 const loginForm = reactive({
   username: '',
@@ -70,6 +74,19 @@ const handleLogin = async () => {
     loading.value = false
   }
 }
+
+const goRegister = () => {
+  router.push('/admin/register')
+}
+
+onMounted(async () => {
+  try {
+    const resp = await request.get('/api/admin/can-register')
+    canRegister.value = !!resp.data?.can_register
+  } catch (_) {
+    canRegister.value = false
+  }
+})
 </script>
 
 <style scoped>
@@ -88,5 +105,10 @@ const handleLogin = async () => {
 .login-card h2 {
   text-align: center;
   margin: 0;
+}
+
+.tips {
+  text-align: center;
+  color: #666;
 }
 </style>

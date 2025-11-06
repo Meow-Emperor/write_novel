@@ -18,7 +18,7 @@
           >
             <el-menu-item index="/">首页</el-menu-item>
             <el-menu-item index="/novels">我的小说</el-menu-item>
-            <el-menu-item index="/admin/login">管理后台</el-menu-item>
+            <el-menu-item index="/admin">管理后台</el-menu-item>
             <el-sub-menu index="tools" v-if="currentNovelId">
               <template #title>创作工具</template>
               <el-menu-item :index="`/novels/${currentNovelId}`">小说详情</el-menu-item>

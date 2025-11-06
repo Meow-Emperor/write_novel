@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import axios from 'axios'
+import request from '@/utils/request'
 import type { Novel, NovelCreate, NovelUpdate } from '@/types/novel'
 
 export const useNovelStore = defineStore('novel', () => {
@@ -16,7 +16,7 @@ export const useNovelStore = defineStore('novel', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await axios.get<Novel[]>('/api/novels')
+      const response = await request.get<Novel[]>('/api/novels')
       novels.value = response.data
     } catch (err: any) {
       error.value = err.response?.data?.detail ?? err.message
@@ -30,7 +30,7 @@ export const useNovelStore = defineStore('novel', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await axios.get<Novel>(`/api/novels/${id}`)
+      const response = await request.get<Novel>(`/api/novels/${id}`)
       currentNovel.value = response.data
       return response.data
     } catch (err: any) {
@@ -45,7 +45,7 @@ export const useNovelStore = defineStore('novel', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await axios.post<Novel>('/api/novels', novelData)
+      const response = await request.post<Novel>('/api/novels', novelData)
       novels.value.push(response.data)
       return response.data
     } catch (err: any) {
@@ -60,7 +60,7 @@ export const useNovelStore = defineStore('novel', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await axios.put<Novel>(`/api/novels/${id}`, novelData)
+      const response = await request.put<Novel>(`/api/novels/${id}`, novelData)
       const index = novels.value.findIndex((novel) => novel.id === id)
       if (index !== -1) {
         novels.value[index] = response.data
@@ -81,7 +81,7 @@ export const useNovelStore = defineStore('novel', () => {
     loading.value = true
     error.value = null
     try {
-      await axios.delete(`/api/novels/${id}`)
+      await request.delete(`/api/novels/${id}`)
       novels.value = novels.value.filter((novel) => novel.id !== id)
       if (currentNovel.value?.id === id) {
         currentNovel.value = null

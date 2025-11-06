@@ -4,10 +4,16 @@
       <template #header>
         <div class="card-header">
           <h2>角色管理</h2>
-          <el-button type="primary" @click="handleCreate">
+          <div>
+            <el-button class="mr-8" @click="aiGenerateCharacter" :loading="aiLoading">
+              <el-icon><Plus /></el-icon>
+              AI 生成角色
+            </el-button>
+            <el-button type="primary" @click="handleCreate">
             <el-icon><Plus /></el-icon>
             新建角色
-          </el-button>
+            </el-button>
+          </div>
         </div>
       </template>
 
@@ -101,12 +107,16 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import request from '@/utils/request'
+import { useAIStore } from '@/stores/ai'
+import { parseCharacter } from '@/utils/aiParse'
 
 const route = useRoute()
 const novelId = route.params.id as string
+const aiStore = useAIStore()
 
 const loading = ref(false)
 const submitting = ref(false)
+const aiLoading = ref(false)
 const dialogVisible = ref(false)
 const isEditing = ref(false)
 const characters = ref<any[]>([])
@@ -219,6 +229,49 @@ const handleSubmit = async () => {
       submitting.value = false
     }
   })
+}
+
+// AI 生成角色并预填表单
+const aiGenerateCharacter = async () => {
+  try {
+    aiLoading.value = true
+    // 若未打开表单，先打开创建表单
+    if (!dialogVisible.value) {
+      isEditing.value = false
+      dialogVisible.value = true
+    }
+
+    // 默认以 formData.role 作为角色类型，否则使用主角
+    const role = (formData.value.role || 'protagonist').toString()
+    const traits = (formData.value.personality || '').toString()
+
+    const cfg = aiStore.config
+    const resp = await request.post('/api/ai/generate-character', {
+      novel_id: novelId,
+      character_role: role,
+      character_traits: traits || undefined,
+      provider: cfg.provider,
+      base_url: cfg.base_url,
+      api_key: cfg.api_key,
+      model_name: cfg.model_name,
+      temperature: cfg.temperature
+    })
+
+    const content: string = resp.data?.content || ''
+    const parsed = parseCharacter(content)
+    formData.value.name = parsed.name || formData.value.name || 'AI角色'
+    formData.value.role = parsed.role || formData.value.role
+    formData.value.description = parsed.description || content
+    formData.value.personality = parsed.personality || formData.value.personality
+    formData.value.background = parsed.background || formData.value.background
+    formData.value.appearance = parsed.appearance || formData.value.appearance
+    formData.value.relationships = parsed.relationships || formData.value.relationships
+    ElMessage.success('已用 AI 生成并填入表单，请检查后保存')
+  } catch (e) {
+    // 拦截器已提示
+  } finally {
+    aiLoading.value = false
+  }
 }
 
 const resetForm = () => {
