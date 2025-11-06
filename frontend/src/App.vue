@@ -20,8 +20,8 @@ import ErrorBoundary from './components/ErrorBoundary.vue'
 
 body {
   margin: 0;
-  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
-  background-color: #f5f6fa;
+  font-family: 'Noto Sans SC', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  background-color: #f8fafc;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -37,21 +37,23 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: #f1f5f9;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #888;
+  background: #94a3b8;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: #64748b;
 }
 
-/* Element Plus 主题覆盖 */
+/* Naive UI 主题覆盖 */
 :root {
-  --el-color-primary: #667eea;
+  --primary-color: #3b82f6;
+  --primary-color-hover: #2563eb;
+  --primary-color-pressed: #1d4ed8;
 }
 </style>

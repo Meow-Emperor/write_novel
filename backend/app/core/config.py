@@ -15,10 +15,12 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str = "sqlite:///./ai_novel.db"
+    DATABASE_TYPE: str = "sqlite"  # sqlite, mysql, libsql
 
     # API Keys
     OPENAI_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
     CUSTOM_API_URL: str = ""
     CUSTOM_API_KEY: str = ""
 
