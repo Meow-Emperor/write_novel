@@ -34,7 +34,7 @@ if redis is not None and settings.AI_CACHE_ENABLED:
         _redis_client = None
 else:
     _redis_client = None
-
+ 
 
 class AIService:
     def __init__(
@@ -56,6 +56,27 @@ class AIService:
             return settings.ANTHROPIC_API_KEY
         return ""
 
+    def _get_default_base_url(self, provider: str) -> str:
+        if provider == "ollama":
+            return settings.OLLAMA_BASE_URL
+        return ""
+
+    def split_text(self, text: str, chunk_size: int = 1000, chunk_overlap: int = 200) -> List[str]:
+        """Split text into chunks using langchain text splitter"""
+        if RecursiveCharacterTextSplitter is None:
+            # Fallback to simple splitting
+            chunks = []
+            for i in range(0, len(text), chunk_size - chunk_overlap):
+                chunks.append(text[i:i + chunk_size])
+            return chunks
+        
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            length_function=len,
+        )
+        return splitter.split_text(text)
+
     async def generate(self, prompt: str, context: Dict[str, Any], max_tokens: int = 2000, temperature: Optional[float] = None) -> Dict[str, Any]:
         """Generate content using AI based on provider"""
         full_prompt = self.build_context_prompt(context, prompt)
@@ -72,20 +93,6 @@ class AIService:
                 return True
             return val.strip().lower().startswith("your-")
 
-        if getattr(_settings, "DEBUG", False):
-            if self.provider in ("openai", "anthropic") and _is_placeholder(self.api_key):
-                # Return mock content with context echo for visibility
-                return {
-                    "content": f"[DEV-MOCK:{self.provider}]\nModel: {self.model_name}\nPrompt: {prompt[:160]}...\n(Provide real API key to generate actual content.)",
-                    "tokens_used": 0,
-                    "model": self.model_name,
-                }
-            if self.provider not in ("openai", "anthropic") and not self.base_url:
-                return {
-                    "content": f"[DEV-MOCK:custom]\nNo base_url provided. Echo prompt preview: {prompt[:160]}...",
-                    "tokens_used": 0,
-                    "model": self.model_name,
-                }
         cache_key = None
         if _redis_client:
             cache_input = f"{self.provider}:{self.model_name}:{prompt}".encode("utf-8")
@@ -168,6 +175,32 @@ class AIService:
             }
         except Exception as e:
             raise Exception(f"Anthropic API error while generating content: {str(e)}") from e
+
+    async def _generate_ollama(self, prompt: str, max_tokens: int, temperature: Optional[float]) -> Dict[str, Any]:
+        """Generate using Ollama local API"""
+        if ollama is None:
+            raise Exception("Ollama library is not installed. Install it with: pip install ollama")
+        
+        try:
+            base_url = self._get_default_base_url("ollama")
+            client = ollama.AsyncClient(host=base_url)
+            
+            response = await client.chat(
+                model=self.model_name,
+                messages=[{"role": "user", "content": prompt}],
+                options={
+                    "temperature": temperature if temperature is not None else 0.7,
+                    "num_predict": max_tokens,
+                }
+            )
+            
+            return {
+                "content": response["message"]["content"],
+                "tokens_used": response.get("prompt_eval_count", 0) + response.get("eval_count", 0),
+                "model": self.model_name
+            }
+        except Exception as e:
+            raise Exception(f"Ollama API error while generating content: {str(e)}") from e
 
     async def _generate_custom(self, prompt: str, max_tokens: int, temperature: Optional[float]) -> Dict[str, Any]:
         """Generate using custom API endpoint"""

@@ -3,6 +3,8 @@ import vue from '@vitejs/plugin-vue'
 import vueJsx from '@vitejs/plugin-vue-jsx'
 import path from 'path'
 import VueDevTools from 'vite-plugin-vue-devtools'
+import tailwindcss from 'tailwindcss'
+import autoprefixer from 'autoprefixer'
 
 // Use env var VITE_API_BASE_URL when available; fallback remains Docker-friendly
 // For local dev (no Docker), set VITE_API_BASE_URL=http://localhost:8000 in frontend/.env
@@ -35,8 +37,8 @@ export default defineConfig(({ mode }) => {
     css: {
       postcss: {
         plugins: [
-          require('tailwindcss'),
-          require('autoprefixer'),
+          tailwindcss,
+          autoprefixer,
         ],
       },
     },
