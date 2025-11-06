@@ -1,0 +1,19 @@
+services:
+  backend:
+    environment:
+      - AI_CACHE_ENABLED=true
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai-novel-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - ai-novel-network
+
+networks:
+  ai-novel-network:
+    external: false
+

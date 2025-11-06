@@ -13,6 +13,9 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
+      - AI_CACHE_ENABLED=${AI_CACHE_ENABLED:-false}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     volumes:
       - ./backend:/app
       - backend-data:/app/data
@@ -29,7 +32,7 @@ services:
     ports:
       - "5173:5173"
     environment:
-      - VITE_API_BASE_URL=http://localhost:8000
+      - VITE_API_BASE_URL=http://backend:8000
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -38,6 +41,17 @@ services:
       - backend
     networks:
       - ai-novel-network
+
+  # Redis 缓存（可选）
+  redis:
+    image: redis:7-alpine
+    container_name: ai-novel-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - ai-novel-network
+    profiles:
+      - cache  # 使用 --profile cache 启动
 
   # PostgreSQL服务（可选，如果需要使用PostgreSQL）
   postgres:
