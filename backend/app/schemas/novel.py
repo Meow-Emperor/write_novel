@@ -6,31 +6,33 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from ..models.novel import NovelStatus
+# NovelStatus removed - using string status now
 
 
 class NovelBase(BaseModel):
     title: str = Field(..., max_length=200)
-    author: Optional[str] = Field(None, max_length=100)
-    genre: Optional[str] = Field(None, max_length=50)
+    initial_prompt: Optional[str] = None
+    status: Optional[str] = "draft"
+    # 兼容旧版字段（仅用于请求与响应层，不写入 Novel 表）
+    author: Optional[str] = None
+    genre: Optional[str] = None
     description: Optional[str] = None
-    status: Optional[NovelStatus] = NovelStatus.DRAFT
 
 
 class NovelCreate(NovelBase):
-    pass
+    # 预留可选 user_id（安全起见服务端忽略外部传入，仅从登录用户获取）
+    user_id: Optional[int] = None
 
 
 class NovelUpdate(BaseModel):
     title: Optional[str] = Field(None, max_length=200)
-    author: Optional[str] = Field(None, max_length=100)
-    genre: Optional[str] = Field(None, max_length=50)
-    description: Optional[str] = None
-    status: Optional[NovelStatus] = None
+    initial_prompt: Optional[str] = None
+    status: Optional[str] = None
 
 
 class NovelResponse(NovelBase):
-    id: UUID
+    id: str
+    user_id: int
     created_at: datetime
     updated_at: datetime
 

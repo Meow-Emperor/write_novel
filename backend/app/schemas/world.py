@@ -26,8 +26,8 @@ class WorldSettingUpdate(BaseModel):
 
 
 class WorldSettingResponse(WorldSettingBase):
-    id: UUID
-    novel_id: UUID
+    id: int
+    novel_id: str
     created_at: datetime
 
     class Config:

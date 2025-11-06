@@ -13,7 +13,7 @@ class ChapterBase(BaseModel):
     summary: Optional[str] = None
     content: Optional[str] = None
     word_count: int = Field(default=0)
-    status: str = Field(default="draft", max_length=50)
+    status: str = Field(default="DRAFT", max_length=50)
     notes: Optional[str] = None
 
 
@@ -32,8 +32,9 @@ class ChapterUpdate(BaseModel):
 
 
 class ChapterResponse(ChapterBase):
-    id: UUID
-    novel_id: UUID
+    # DB primary key is integer; novel_id references UUID string
+    id: int
+    novel_id: str
     created_at: datetime
     updated_at: datetime
 

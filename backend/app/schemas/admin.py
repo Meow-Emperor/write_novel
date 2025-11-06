@@ -4,12 +4,12 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 class AdminBase(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
-    email: EmailStr
+    email: str
     full_name: Optional[str] = Field(None, max_length=100)
 
 
@@ -19,7 +19,7 @@ class AdminCreate(AdminBase):
 
 
 class AdminUpdate(BaseModel):
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
     full_name: Optional[str] = Field(None, max_length=100)
     password: Optional[str] = Field(None, min_length=6)
     is_active: Optional[bool] = None

@@ -18,6 +18,7 @@ class CharacterBase(BaseModel):
 
 
 class CharacterCreate(CharacterBase):
+    # Novel uses UUID string identifiers; accept UUID here and map to str in routes
     novel_id: UUID
 
 
@@ -32,8 +33,10 @@ class CharacterUpdate(BaseModel):
 
 
 class CharacterResponse(CharacterBase):
-    id: UUID
-    novel_id: UUID
+    # Character primary key is an integer in the DB model
+    id: int
+    # Novel foreign key is a UUID string
+    novel_id: str
     created_at: datetime
     updated_at: datetime
 

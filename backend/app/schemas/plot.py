@@ -32,8 +32,8 @@ class PlotUpdate(BaseModel):
 
 
 class PlotResponse(PlotBase):
-    id: UUID
-    novel_id: UUID
+    id: int
+    novel_id: str
     created_at: datetime
     updated_at: datetime
 

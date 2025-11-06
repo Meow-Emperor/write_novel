@@ -1,8 +1,28 @@
 from typing import Dict, Any, Optional
+import hashlib
+import json
+
 import httpx
-from openai import AsyncOpenAI
-from anthropic import AsyncAnthropic
+
 from ..core.config import settings
+
+try:
+    import redis  # type: ignore
+except ImportError:
+    redis = None
+
+if redis is not None and settings.AI_CACHE_ENABLED:
+    try:
+        _redis_client = redis.Redis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, decode_responses=True)
+        # Proactively verify connectivity; if it fails, disable caching gracefully
+        try:
+            _redis_client.ping()
+        except Exception:  # noqa: BLE001
+            _redis_client = None
+    except Exception:  # noqa: BLE001
+        _redis_client = None
+else:
+    _redis_client = None
 
 
 class AIService:
@@ -25,25 +45,85 @@ class AIService:
             return settings.ANTHROPIC_API_KEY
         return ""
 
-    async def generate(self, prompt: str, context: Dict[str, Any], max_tokens: int = 2000) -> Dict[str, Any]:
+    async def generate(self, prompt: str, context: Dict[str, Any], max_tokens: int = 2000, temperature: Optional[float] = None) -> Dict[str, Any]:
         """Generate content using AI based on provider"""
         full_prompt = self.build_context_prompt(context, prompt)
+        # Development-friendly fallback: if running in DEBUG and no valid key/base_url provided,
+        # return a deterministic mock response so that frontend flows remain testable without errors.
+        # This does NOT run in production (DEBUG=False) and does not replace real providers when keys exist.
+        try:
+            from ..core.config import settings as _settings
+        except Exception:
+            _settings = settings
+
+        def _is_placeholder(val: Optional[str]) -> bool:
+            if not val:
+                return True
+            return val.strip().lower().startswith("your-")
+
+        if getattr(_settings, "DEBUG", False):
+            if self.provider in ("openai", "anthropic") and _is_placeholder(self.api_key):
+                # Return mock content with context echo for visibility
+                return {
+                    "content": f"[DEV-MOCK:{self.provider}]\nModel: {self.model_name}\nPrompt: {prompt[:160]}...\n(Provide real API key to generate actual content.)",
+                    "tokens_used": 0,
+                    "model": self.model_name,
+                }
+            if self.provider not in ("openai", "anthropic") and not self.base_url:
+                return {
+                    "content": f"[DEV-MOCK:custom]\nNo base_url provided. Echo prompt preview: {prompt[:160]}...",
+                    "tokens_used": 0,
+                    "model": self.model_name,
+                }
+        cache_key = None
+        if _redis_client:
+            cache_input = f"{self.provider}:{self.model_name}:{prompt}".encode("utf-8")
+            cache_key = hashlib.md5(cache_input).hexdigest()
+            try:
+                cached_value = _redis_client.get(cache_key)
+            except Exception:  # noqa: BLE001
+                cached_value = None
+                # Disable cache for this process to avoid repeated connection errors
+                try:
+                    _redis_client.close()
+                except Exception:
+                    pass
+                globals().update({"_redis_client": None})
+            if cached_value:
+                try:
+                    return json.loads(cached_value)
+                except json.JSONDecodeError:
+                    pass
 
         if self.provider == "openai":
-            return await self._generate_openai(full_prompt, max_tokens)
+            result = await self._generate_openai(full_prompt, max_tokens, temperature)
         elif self.provider == "anthropic":
-            return await self._generate_anthropic(full_prompt, max_tokens)
+            result = await self._generate_anthropic(full_prompt, max_tokens, temperature)
         else:
-            return await self._generate_custom(full_prompt, max_tokens)
+            result = await self._generate_custom(full_prompt, max_tokens, temperature)
 
-    async def _generate_openai(self, prompt: str, max_tokens: int) -> Dict[str, Any]:
+        if _redis_client and cache_key:
+            try:
+                _redis_client.setex(cache_key, 86400, json.dumps(result))
+            except Exception:  # noqa: BLE001
+                pass
+
+        return result
+
+    async def _generate_openai(self, prompt: str, max_tokens: int, temperature: Optional[float]) -> Dict[str, Any]:
         """Generate using OpenAI API"""
         try:
+            try:
+                from openai import AsyncOpenAI  # type: ignore
+            except ImportError as e:
+                raise Exception("OpenAI SDK is not installed. Set provider to 'custom' or install openai.") from e
+
             client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
             response = await client.chat.completions.create(
                 model=self.model_name,
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
+                temperature=temperature if temperature is not None else 0.7
             )
             return {
                 "content": response.choices[0].message.content,
@@ -51,16 +131,22 @@ class AIService:
                 "model": self.model_name
             }
         except Exception as e:
-            raise Exception(f"OpenAI API error: {str(e)}")
+            raise Exception(f"OpenAI API error while generating content: {str(e)}") from e
 
-    async def _generate_anthropic(self, prompt: str, max_tokens: int) -> Dict[str, Any]:
+    async def _generate_anthropic(self, prompt: str, max_tokens: int, temperature: Optional[float]) -> Dict[str, Any]:
         """Generate using Anthropic API"""
         try:
+            try:
+                from anthropic import AsyncAnthropic  # type: ignore
+            except ImportError as e:
+                raise Exception("Anthropic SDK is not installed. Set provider to 'custom' or install anthropic.") from e
+
             client = AsyncAnthropic(api_key=self.api_key, base_url=self.base_url)
             response = await client.messages.create(
                 model=self.model_name,
                 max_tokens=max_tokens,
-                messages=[{"role": "user", "content": prompt}]
+                messages=[{"role": "user", "content": prompt}],
+                temperature=temperature if temperature is not None else 0.7
             )
             return {
                 "content": response.content[0].text,
@@ -68,31 +154,40 @@ class AIService:
                 "model": self.model_name
             }
         except Exception as e:
-            raise Exception(f"Anthropic API error: {str(e)}")
+            raise Exception(f"Anthropic API error while generating content: {str(e)}") from e
 
-    async def _generate_custom(self, prompt: str, max_tokens: int) -> Dict[str, Any]:
+    async def _generate_custom(self, prompt: str, max_tokens: int, temperature: Optional[float]) -> Dict[str, Any]:
         """Generate using custom API endpoint"""
         if not self.base_url:
             raise Exception("Custom provider requires base_url")
 
         try:
-            # Smart URL handling: if base_url already contains the endpoint, use it directly
-            if self.base_url.endswith('/chat/completions') or self.base_url.endswith('/completions'):
-                api_url = self.base_url
+            # Smart URL handling: support both chat/completions and completions endpoints
+            base = self.base_url.rstrip('/')
+            if base.endswith('/chat/completions'):
+                api_url = base
+                use_chat = True
+            elif base.endswith('/completions'):
+                api_url = base
+                use_chat = False
             else:
-                # Otherwise append the standard OpenAI endpoint
-                api_url = f"{self.base_url.rstrip('/')}/v1/chat/completions"
+                api_url = f"{base}/v1/chat/completions"
+                use_chat = True
 
             async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(
-                    api_url,
-                    json={
-                        "model": self.model_name,
-                        "messages": [{"role": "user", "content": prompt}],
-                        "max_tokens": max_tokens
-                    },
-                    headers={"Authorization": f"Bearer {self.api_key}"}
-                )
+                payload = {
+                    "model": self.model_name,
+                    "max_tokens": max_tokens,
+                    "temperature": temperature if temperature is not None else 0.7,
+                }
+                if use_chat:
+                    payload["messages"] = [{"role": "user", "content": prompt}]
+                else:
+                    payload["prompt"] = prompt
+
+                headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+
+                response = await client.post(api_url, json=payload, headers=headers)
 
                 # Check for HTTP errors
                 if response.status_code != 200:
@@ -101,21 +196,78 @@ class AIService:
 
                 data = response.json()
 
-                # Validate response structure
-                if "choices" not in data or len(data["choices"]) == 0:
-                    raise Exception(f"Invalid API response structure: {data}")
+                def _extract_content(d: dict) -> str | None:
+                    choices = d.get("choices") or []
+                    if not choices:
+                        return None
+                    c0 = choices[0]
+                    if not isinstance(c0, dict):
+                        return None
+                    # Chat style
+                    msg = c0.get("message")
+                    if isinstance(msg, dict):
+                        mc = msg.get("content")
+                        if isinstance(mc, str):
+                            return mc
+                        if isinstance(mc, list):
+                            # e.g. [{type: 'text', text: '...'}]
+                            texts = []
+                            for item in mc:
+                                if isinstance(item, dict) and "text" in item:
+                                    texts.append(str(item["text"]))
+                                elif isinstance(item, str):
+                                    texts.append(item)
+                            if texts:
+                                return "\n".join(texts)
+                    # Text completions style
+                    if isinstance(c0.get("text"), str):
+                        return c0["text"]
+                    return None
 
-                return {
-                    "content": data["choices"][0]["message"]["content"],
-                    "tokens_used": data.get("usage", {}).get("total_tokens", 0),
-                    "model": self.model_name
-                }
+                content = _extract_content(data)
+
+                # If no choices/content, try alternate endpoint once
+                if not content:
+                    alt_api = None
+                    alt_payload = None
+                    if use_chat:
+                        alt_api = f"{base}/v1/completions"
+                        alt_payload = {
+                            "model": self.model_name,
+                            "prompt": prompt,
+                            "max_tokens": max_tokens,
+                            "temperature": temperature if temperature is not None else 0.7,
+                        }
+                    else:
+                        alt_api = f"{base}/v1/chat/completions"
+                        alt_payload = {
+                            "model": self.model_name,
+                            "messages": [{"role": "user", "content": prompt}],
+                            "max_tokens": max_tokens,
+                            "temperature": temperature if temperature is not None else 0.7,
+                        }
+                    resp2 = await client.post(alt_api, json=alt_payload, headers=headers)
+                    if resp2.status_code == 200:
+                        data2 = resp2.json()
+                        content = _extract_content(data2)
+                        if content:
+                            data = data2
+
+                if not content:
+                    raise Exception(f"Invalid API response structure or empty choices: {data}")
+
+                usage = data.get("usage", {})
+                tokens_used = usage.get("total_tokens") or (
+                    (usage.get("prompt_tokens") or 0) + (usage.get("completion_tokens") or 0)
+                )
+
+                return {"content": content, "tokens_used": tokens_used or 0, "model": self.model_name}
         except httpx.TimeoutException:
             raise Exception("API request timeout (60s)")
         except httpx.RequestError as e:
             raise Exception(f"Network error: {str(e)}")
         except Exception as e:
-            raise Exception(f"Custom API error: {str(e)}")
+            raise Exception(f"Custom API error while generating content: {str(e)}") from e
 
     def build_context_prompt(self, context: Dict[str, Any], user_prompt: str) -> str:
         """Build context-aware prompt"""
